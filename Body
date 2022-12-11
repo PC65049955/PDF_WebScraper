@@ -59,6 +59,8 @@ class PDFScraper:
                 # Save the PDF to the selected directory
                 with open(os.path.join(directory, os.path.basename(pdf_link)), "wb") as f:
                     f.write(pdf_response.content)
+            else:
+                self.label.configure(text="Invalid URL or PDF could not be downloaded.")
 
             # Update the progress bar
             self.progress["value"] = i + 1
