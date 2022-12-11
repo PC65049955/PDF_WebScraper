@@ -3,6 +3,9 @@ import requests
 import os
 from bs4 import BeautifulSoup
 from tkinter.ttk import Progressbar
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 
 class PDFScraper:
     def __init__(self, root):
@@ -41,33 +44,45 @@ class PDFScraper:
 
         # Prompt the user to select a directory to save the PDFs to
         directory = filedialog.askdirectory(title="Select directory to save PDFs")
+if not directory:
+return
 
-        # Set the maximum value of the progress bar to the number of PDFs
-        self.progress["maximum"] = len(pdf_links)
+Copy code
+    # Download each PDF and save it to the selected directory
+    for link in pdf_links:
+        self.download_pdf(link, directory)
 
-        # Download each PDF
-        for i, pdf_link in enumerate(pdf_links):
-            # Send a GET request to the PDF link
-            try:
-                pdf_response = requests.get(pdf_link)
-            except requests.exceptions.RequestException as e:
-                self.label.configure(text="Error downloading PDF: " + str(e))
-                return
+def download_pdf(self, link, directory):
+    # Get the PDF file name
+    file_name = link.split("/")[-1]
 
-            # Check if the response is valid
-            if pdf_response.status_code == 200:
-                # Save the PDF to the selected directory
-                with open(os.path.join(directory, os.path.basename(pdf_link)), "wb") as f:
-                    f.write(pdf_response.content)
-            else:
-                self.label.configure(text="Invalid URL or PDF could not be downloaded.")
+    # Set the progress bar to 0
+    self.progress["value"] = 0
+
+    # Send a GET request to the link to download the PDF
+    response = requests.get(link, stream=True)
+
+    # Total size in bytes of the PDF
+    total_size = int(response.headers.get("content-length", 0))
+
+    # Create a variable to keep track of the number of bytes downloaded so far
+    downloaded = 0
+
+    # Open the PDF file in write-binary mode
+    with open(os.path.join(directory, file_name), "wb") as f:
+        # Iterate over the response data in chunks
+        for data in response.iter_content(4096):
+            # Write the data to the file
+            f.write(data)
 
             # Update the progress bar
-            self.progress["value"] = i + 1
+            downloaded += len(data)
+            self.progress["value"] = downloaded / total_size
+            self.root.update()
 
-        self.label.configure(text="PDFs downloaded successfully!")
-
-if __name__ == "__main__":
-    root = Tk()
-    scraper = PDFScraper(root)
-    root.mainloop()
+    # Reset the progress bar
+    self.progress["value"] = 0
+if name == "main":
+root = Tk()
+pdf_scraper = PDFScraper(root)
+root.mainloop()
