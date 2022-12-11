@@ -1,0 +1,71 @@
+from tkinter import Tk, Label, Button, Entry, filedialog
+import requests
+import os
+from bs4 import BeautifulSoup
+from tkinter.ttk import Progressbar
+
+class PDFScraper:
+    def __init__(self, root):
+        self.root = root
+        root.title("PDF Scraper")
+
+        self.label = Label(root, text="Enter the URL of the site to search for PDFs:")
+        self.label.pack()
+
+        self.url_entry = Entry(root)
+        self.url_entry.pack()
+
+        self.download_button = Button(root, text="Search and Download PDFs", command=self.search_and_download)
+        self.download_button.pack()
+
+        # Create a progress bar to show the download progress of each PDF
+        self.progress = Progressbar(root, orient="horizontal", length=100, mode="determinate")
+        self.progress.pack()
+
+    def search_and_download(self):
+        # Get the URL entered by the user
+        url = self.url_entry.get()
+
+        # Send a GET request to the URL
+        try:
+            response = requests.get(url)
+        except requests.exceptions.RequestException as e:
+            self.label.configure(text="Invalid URL: " + str(e))
+            return
+
+        # Parse the HTML content of the page
+        soup = BeautifulSoup(response.content, "html.parser")
+
+        # Find all PDF links on the page
+        pdf_links = [a["href"] for a in soup.find_all("a", href=True) if a["href"].endswith(".pdf")]
+
+        # Prompt the user to select a directory to save the PDFs to
+        directory = filedialog.askdirectory(title="Select directory to save PDFs")
+
+        # Set the maximum value of the progress bar to the number of PDFs
+        self.progress["maximum"] = len(pdf_links)
+
+        # Download each PDF
+        for i, pdf_link in enumerate(pdf_links):
+            # Send a GET request to the PDF link
+            try:
+                pdf_response = requests.get(pdf_link)
+            except requests.exceptions.RequestException as e:
+                self.label.configure(text="Error downloading PDF: " + str(e))
+                return
+
+            # Check if the response is valid
+            if pdf_response.status_code == 200:
+                # Save the PDF to the selected directory
+                with open(os.path.join(directory, os.path.basename(pdf_link)), "wb") as f:
+                    f.write(pdf_response.content)
+
+            # Update the progress bar
+            self.progress["value"] = i + 1
+
+        self.label.configure(text="PDFs downloaded successfully!")
+
+if __name__ == "__main__":
+    root = Tk()
+    scraper = PDFScraper(root)
+    root.mainloop()
