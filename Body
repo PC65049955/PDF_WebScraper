@@ -7,82 +7,117 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
+
 class PDFScraper:
     def __init__(self, root):
         self.root = root
         root.title("PDF Scraper")
 
-        self.label = Label(root, text="Enter the URL of the site to search for PDFs:")
+        self.label = Label(
+            root, text="Enter the URL of the site to search for PDFs:")
         self.label.pack()
 
         self.url_entry = Entry(root)
         self.url_entry.pack()
 
-        self.download_button = Button(root, text="Search and Download PDFs", command=self.search_and_download)
+        self.page_entry = Entry(root)
+        self.page_entry.pack()
+
+        self.download_button = Button(
+            root, text="Search and Download PDFs", command=self.search_and_download)
         self.download_button.pack()
 
         # Create a progress bar to show the download progress of each PDF
-        self.progress = Progressbar(root, orient="horizontal", length=100, mode="determinate")
+        self.progress = Progressbar(
+            root, orient="horizontal", length=100, mode="determinate")
         self.progress.pack()
 
     def search_and_download(self):
         # Get the URL entered by the user
         url = self.url_entry.get()
 
-        # Send a GET request to the URL
-        try:
-            response = requests.get(url)
-        except requests.exceptions.RequestException as e:
-            self.label.configure(text="Invalid URL: " + str(e))
-            return
+        # Get the number of pages entered by the user
+        num_pages = int(self.page_entry.get())
 
-        # Parse the HTML content of the page
-        soup = BeautifulSoup(response.content, "html.parser")
+        # Create a list to store the PDF links found on each page
+        pdf_links = []
 
-        # Find all PDF links on the page
-        pdf_links = [a["href"] for a in soup.find_all("a", href=True) if a["href"].endswith(".pdf")]
+        for page in range(1, num_pages + 1):
+            # Construct the URL for the current page
+            page_url = url + "?page=" + str(page)
+
+            # Send a GET request to the URL
+            try:
+                response = requests.get(page_url)
+            except requests.exceptions.RequestException as e:
+                self.label.configure(text="Invalid URL: " + str(e))
+                return
+
+            # Parse the HTML content of the page
+            html_soup = BeautifulSoup(response.content, "html.parser")
+
+            # Find all PDF links on the page
+            page_pdf_links = [a["href"]
+                              for a in html_soup.find_all("a", href=True)
+                              if a["href"].endswith(".pdf")]
+
+            # Add the PDF links from the current page to the list
+            pdf_links += page_pdf_links
 
         # Prompt the user to select a directory to save the PDFs to
-        directory = filedialog.askdirectory(title="Select directory to save PDFs")
-if not directory:
-return
+        directory = filedialog.askdirectory(
+            title="Select directory to save PDFs")
 
-Copy code
-    # Download each PDF and save it to the selected directory
-    for link in pdf_links:
-        self.download_pdf(link, directory)
+        if not directory:
+            return
 
-def download_pdf(self, link, directory):
-    # Get the PDF file name
-    file_name = link.split("/")[-1]
+        # Download each PDF and save it to the selected directory
+        for link in pdf_links:
+            self.download_pdf(link, directory)
 
-    # Set the progress bar to 0
-    self.progress["value"] = 0
+    def download_pdf(self, link, directory):
+        # Get the PDF file name
+                file_name = link.split("/")[-1]
 
-    # Send a GET request to the link to download the PDF
-    response = requests.get(link, stream=True)
+        # Set the progress bar to 0
+        self.progress["value"] = 0
 
-    # Total size in bytes of the PDF
-    total_size = int(response.headers.get("content-length", 0))
+        # Send a GET request to the link to download the PDF
+        try:
+            response = requests.get(link, stream=True)
+        except requests.exceptions.RequestException as e:
+            self.label.configure(
+                text="Error downloading PDF: " + str(e))
+            return
 
-    # Create a variable to keep track of the number of bytes downloaded so far
-    downloaded = 0
+        # Total size in bytes of the PDF
+        total_size = int(response.headers.get("content-length", 0))
 
-    # Open the PDF file in write-binary mode
-    with open(os.path.join(directory, file_name), "wb") as f:
-        # Iterate over the response data in chunks
-        for data in response.iter_content(4096):
-            # Write the data to the file
-            f.write(data)
+        # Create a variable to keep track of the number of bytes downloaded so far
+        downloaded = 0
 
-            # Update the progress bar
-            downloaded += len(data)
-            self.progress["value"] = downloaded / total_size
-            self.root.update()
+        # Open the PDF file in write - binary mode
+        try:
+            with open(os.path.join(directory, file_name), "wb") as f:
+                # Iterate over the response data in chunks
+                for data in response.iter_content(4096):
+                    # Write the data to the file
+                    f.write(data)
 
-    # Reset the progress bar
-    self.progress["value"] = 0
-if name == "main":
-root = Tk()
-pdf_scraper = PDFScraper(root)
-root.mainloop()
+                    # Update the progress bar
+                    downloaded += len(data)
+                    self.progress["value"] = downloaded / total_size
+                    self.root.update()
+        except IOError as e:
+            self.label.configure(
+                text="Error saving PDF: " + str(e))
+            return
+
+        # Reset the progress bar
+        self.progress["value"] = 0
+
+
+if __name__ == "__main__":
+    root_window = Tk()
+    pdf_scraper = PDFScraper(root_window)
+    root_window.mainloop()
