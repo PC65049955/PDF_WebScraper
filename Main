@@ -77,7 +77,7 @@ class PDFScraper:
 
     def download_pdf(self, link, directory):
         # Get the PDF file name
-                file_name = link.split("/")[-1]
+        file_name = link.split("/")[-1]
 
         # Set the progress bar to 0
         self.progress["value"] = 0
@@ -118,6 +118,6 @@ class PDFScraper:
 
 
 if __name__ == "__main__":
-    root_window = Tk()
-    pdf_scraper = PDFScraper(root_window)
-    root_window.mainloop()
+    root = Tk()
+    pdf_scraper = PDFScraper(root)
+    root.mainloop()
