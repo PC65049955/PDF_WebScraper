@@ -1,8 +1,8 @@
 import PySimpleGUI as sg
 import requests
 import os
+import threading
 from bs4 import BeautifulSoup
-
 
 class PDFScraper:
     def __init__(self):
@@ -11,17 +11,15 @@ class PDFScraper:
             [sg.Text("Enter the URL of the site to search for PDFs:")],
             [sg.Input(key="url")],
             [sg.Text("Enter the number of pages to search:")],
-            [sg.Input(key="num_pages")
-             ],
-            [sg.Button("Search and Download PDFs", key="search"),
-             sg.Button("Cancel")],
-            [sg.ProgressBar(100, orientation="h",
-                            size=(20, 20), key="progress")]
+            [sg.Input(key="num_pages")],
+            [sg.Button("Search and Download PDFs", key="search"), sg.Button("Cancel")],
+            [sg.ProgressBar(100, orientation="h", size=(20, 20), key="progress")],
+            [sg.Output(size=(80, 20))]
         ]
 
         # Create the window with the layout
         self.window = sg.Window("PDF Scraper", layout)
-
+    
     def start(self):
         while True:
             # Get the user input and the button that was clicked
@@ -43,6 +41,7 @@ class PDFScraper:
                     # Send a GET request to the URL
                     try:
                         response = requests.get(page_url)
+                        response.raise_for_status()  # Check for HTTP errors
                     except requests.exceptions.RequestException as e:
                         sg.popup_error("Invalid URL: " + str(e))
                         return
@@ -59,20 +58,53 @@ class PDFScraper:
                     pdf_links += page_pdf_links
 
                 # Prompt the user to select a directory to save the PDFs to
-                directory = sg.popup_get_folder(
-                    "Select directory to save PDFs")
+                directory = sg.popup_get_folder("Select directory to save PDFs")
 
                 if not directory:
                     return
 
-                # Download each PDF and save it to the selected directory
-                for link in pdf_links:
-                    self.download_pdf(link, directory)
+                # Start a thread to download PDFs and update the progress bar
+                progress_bar = self.window["progress"]
+                thread = threading.Thread(target=self.download_pdfs, args=(pdf_links, directory, progress_bar))
+                thread.start()
 
             # If the user clicks the "Cancel" button or closes the window
             elif event in (None, "cancel"):
                 # Close the window and exit the application
                 self.window.close()
                 return
+    
+    def download_pdfs(self, pdf_links, directory, progress_bar):
+        total_pdfs = len(pdf_links)
+        progress_value = 0
+
+        for link in pdf_links:
+            progress_value += 1
+            progress_bar.UpdateBar((progress_value / total_pdfs) * 100)
+
+            # Download and save each PDF to the selected directory
+            self.download_pdf(link, directory)
+
+    def download_pdf(self, link, directory):
+        # Extract the filename from the URL
+        filename = link.split("/")[-1]
+        file_path = os.path.join(directory, filename)
+
+        try:
+            # Send a GET request to download the PDF
+            response = requests.get(link, stream=True)
+            response.raise_for_status()  # Check for HTTP errors
+
+            # Save the PDF to the file
+            with open(file_path, "wb") as file:
+                for chunk in response.iter_content(chunk_size=1024):
+                    if chunk:
+                        file.write(chunk)
+        except requests.exceptions.RequestException as e:
+            print("Error downloading PDF:", str(e))
+        except IOError as e:
+            print("Error saving PDF:", str(e))
+
 # Create an instance of the PDFScraper class
-        pdf_
+pdf_scraper = PDFScraper()
+pdf_scraper.start()
